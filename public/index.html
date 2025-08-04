@@ -499,218 +499,40 @@ const Profile = ({ setPage, userName, userId, photoURL }) => {
 };
 
 const DreamDictionary = ({ setPage }) => {
-    // --- Data ---
-    const interpretations = [
-        { symbol: "القط", category: "حيوانات", text: "<strong>تفسير ابن سيرين:</strong> القط الأليف يدل على خادم أمين أو فرح وسرور، بينما القط المتوحش قد يرمز إلى لص أو شخص مخادع. عضة القط تدل على المرض أو الخيانة. <br><strong>تفسير النابلسي:</strong> يرمز إلى الجفاء للزوجة والأولاد والخصام." },
-        { symbol: "الأسد", category: "حيوانات", text: "<strong>تفسير ابن سيرين:</strong> يرمز إلى سلطان قاهر وجبار، أو عدو قوي. من صارع أسداً فإنه يخاصم عدواً. ركوب الأسد يدل على ركوب أمر عظيم أو نيل سلطة. <br><strong>تفسير النابلسي:</strong> يدل على الموت أو الشدة أو السلطان الظالم." },
-        { symbol: "الثعبان", category: "حيوانات", text: "<strong>تفسير ابن سيرين:</strong> الثعبان أو الحية عدو. حية الماء عدو أشد. من رأى أنه يملك حية فإنه يصيب سلطاناً. لدغتها تدل على نيل مكروه من عدو بقدر قوة اللدغة. <br><strong>تفسير النابلسي:</strong> يدل على عدو أو صاحب بدعة. الحية الملساء ترمز للمال." },
-        { symbol: "البيت", category: "جمادات", text: "<strong>تفسير ابن سيرين:</strong> البيت هو زوجة الرجل التي يأوي إليها. بناء بيت جديد للأعزب زواج. اتساع البيت يدل على سعة الرزق والراحة. <br><strong>تفسير النابلسي:</strong> قد يدل البيت على جسم الإنسان، فما يحدث للبيت من خير أو شر يعود على جسده." },
-        { symbol: "الذهب", category: "جمادات", text: "<strong>تفسير ابن سيرين:</strong> رؤية الذهب لا تحمد في التأويل، وتدل على هم وغم وغرامة مالية. من أصاب سبيكة ذهب ذهب منه ماله أو أصابه هم. <br><strong>تفسير النابلسي:</strong> الذهب يدل على الأفراح والأرزاق والأعمال الصالحة وزوال الهموم، خاصة للنساء." },
-        { symbol: "البحر", category: "طبيعة", text: "<strong>تفسير ابن سيرين:</strong> البحر يرمز إلى ملك قوي وعادل. من رأى أنه يشرب من البحر فإنه ينال مالاً من ملك. الغرق في البحر قد يدل على فتنة أو هم كبير. <br><strong>تفسير النابلسي:</strong> البحر الهادئ يدل على تحقيق الأهداف، والبحر الهائج يدل على أهوال وفتن." },
-        { symbol: "الماء", category: "طبيعة", text: "<strong>تفسير ابن سيرين:</strong> الماء الصافي العذب يدل على حياة طيبة وعلم ورزق. شربه يدل على السلامة من الأمراض. الماء الكدر المالح يدل على هم وغم وكرب. <br><strong>تفسير النابلسي:</strong> الماء الجاري رزق دائم، والماء الراكد هم وحبس." },
-        { symbol: "الطيران", category: "أفعال", text: "<strong>تفسير ابن سيرين:</strong> الطيران يدل على السفر أو نيل سلطة. من رأى أنه يطير من سطح إلى سطح فإنه يستبدل زوجته. الطيران للمريض قد يدل على موته. <br><strong>تفسير النابلسي:</strong> من طار وكان أهلاً للولاية نالها، وإن لم يكن أهلاً لها فإنه مرض يصيبه." },
-        { symbol: "الموت", category: "أفعال", text: "<strong>تفسير ابن سيرين:</strong> الموت في المنام يدل على رد الودائع أو شفاء المريض أو فك الأسير. وقد يدل على نقص في الدين وفساد فيه. موت شخص معروف قد يدل على مصيبة في ذلك الشخص. <br><strong>تفسير النابلسي:</strong> يدل على التوبة والرجوع إلى الله، أو على السفر البعيد." },
-        { symbol: "الزواج", category: "أفعال", text: "<strong>تفسير ابن سيرين:</strong> الزواج في المنام يدل على العناية من الله تعالى. وقد يدل على الأسر والدين والهم. زواج الرجل من امرأة مجهولة قد يدل على قرب الأجل. <br><strong>تفسير النابلسي:</strong> من تزوج بامرأة وماتت فإنه يسعى في حرفة لا ينال منها إلا التعب والهم." }
-    ];
-    const categories = [...new Set(interpretations.map(item => item.category))];
-
-    // --- State ---
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeCategory, setActiveCategory] = useState(null);
-    const [selectedInterpretation, setSelectedInterpretation] = useState(null);
-    const [autocompleteSuggestions, setAutocompleteSuggestions] = useState([]);
-    const [notFound, setNotFound] = useState(false);
-    const [savedSymbols, setSavedSymbols] = useState({}); // To track saved state
-
-    // --- Refs for Click Outside ---
-    const searchWrapperRef = useRef(null);
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (searchWrapperRef.current && !searchWrapperRef.current.contains(event.target)) {
-                setAutocompleteSuggestions([]);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-
-    // --- Event Handlers ---
-    const handleSearchChange = (e) => {
-        const value = e.target.value;
-        setSearchTerm(value);
-        setActiveCategory(null);
-        setSelectedInterpretation(null);
-        setNotFound(false);
-
-        if (value.trim() === '') {
-            setAutocompleteSuggestions([]);
-        } else {
-            const suggestions = interpretations.filter(item => item.symbol.startsWith(value));
-            setAutocompleteSuggestions(suggestions);
-        }
+    const [selectedSymbol, setSelectedSymbol] = useState(null);
+    const symbols = {
+        'القطة': 'القطة في الحلم قد ترمز إلى الأنثى الماكرة أو الغادرة، وقد تدل على الخداع أو السرقة. رؤية قطة أليفة قد تكون علامة على الراحة والهدوء.',
+        'الطيران': 'الطيران في الحلم يرمز غالبًا إلى الحرية والطموح والارتقاء. إذا كان الطيران سهلاً وممتعاً، فهو يدل على تحقيق الأهداف والنجاح.',
+        'البحر': 'البحر يمثل الدنيا وأهوالها. البحر الهادئ يدل على الاستقرار والرزق، بينما البحر الهائج يرمز إلى الفتن والمشاكل والصعوبات.',
+        'الأسد': 'الأسد يرمز إلى السلطان أو الحاكم القوي، وقد يدل على العدو الشديد. النصر على الأسد يعني النصر على الأعداء.',
+        'الثعبان': 'الثعبان في الحلم عدو. حجمه وقوته يمثلان قوة العدو. لدغة الثعبان قد تدل على ضرر يصيب الرائي من عدوه.'
     };
 
-    const performSearch = (term) => {
-        const finalTerm = (typeof term === 'string' ? term : searchTerm).trim();
-        if (!finalTerm) return;
-
-        const result = interpretations.find(item => item.symbol === finalTerm);
-        if (result) {
-            setSelectedInterpretation(result);
-            setNotFound(false);
-        } else {
-            setSelectedInterpretation(null);
-            setNotFound(true);
-        }
-        setAutocompleteSuggestions([]);
-        setActiveCategory(null);
-        setSearchTerm(finalTerm);
-    };
-
-    const selectSuggestion = (symbol) => {
-        setSearchTerm(symbol);
-        setAutocompleteSuggestions([]);
-        performSearch(symbol);
-    };
-
-    const showCategory = (category) => {
-        setActiveCategory(category);
-        setSelectedInterpretation(null);
-        setNotFound(false);
-        setSearchTerm('');
-    };
-
-    const handleSaveToJournal = (symbol) => {
-        setSavedSymbols(prev => ({ ...prev, [symbol]: true }));
-        setTimeout(() => {
-            setSavedSymbols(prev => ({ ...prev, [symbol]: false }));
-        }, 2000);
-    };
-
-    // --- Render Logic ---
-    const getCategoryItems = () => interpretations.filter(item => item.category === activeCategory);
-
-    const renderResults = () => {
-        if (selectedInterpretation) {
-            const isSaved = savedSymbols[selectedInterpretation.symbol];
-            return (
-                <div className="fade-in text-right w-full">
-                    <div className="flex justify-between items-start mb-4">
-                        <h2 className="text-3xl font-bold text-indigo-700">{selectedInterpretation.symbol}</h2>
-                        <button
-                            onClick={() => handleSaveToJournal(selectedInterpretation.symbol)}
-                            className={`flex-shrink-0 text-white font-semibold px-4 py-2 rounded-lg focus:outline-none focus:ring-2 transition-all transform hover:scale-105 flex items-center justify-center ${isSaved ? 'bg-blue-500' : 'bg-green-500 hover:bg-green-600 focus:ring-green-400'}`}
-                        >
-                            <Icon path={isSaved ? "M4.5 12.75l6 6 9-13.5" : "M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.5 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"} className="w-5 h-5 ml-2" />
-                            {isSaved ? 'تم الحفظ!' : 'حفظ في سجلي'}
-                        </button>
-                    </div>
-                    <div className="text-lg text-gray-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: selectedInterpretation.text }} />
-                </div>
-            );
-        }
-
-        if (activeCategory) {
-            const items = getCategoryItems();
-            return (
-                <>
-                    <h2 className="text-2xl font-bold text-indigo-700 mb-6 text-center">رموز في فئة: {activeCategory}</h2>
-                    {items.map(item => (
-                        <div
-                            key={item.symbol}
-                            className="fade-in p-4 mb-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50 rounded-lg"
-                            onClick={() => setSelectedInterpretation(item)}
-                        >
-                            <h3 className="font-bold text-xl">{item.symbol}</h3>
-                        </div>
-                    ))}
-                </>
-            );
-        }
-
-        if (notFound) {
-            return (
-                <div className="fade-in text-center">
-                    <h2 className="text-2xl font-bold text-red-500 mb-4">لم يتم العثور على الرمز</h2>
-                    <p className="text-lg text-gray-600">عذرًا، لم نتمكن من العثور على تفسير لـ "{searchTerm}".</p>
-                </div>
-            );
-        }
-
-        // Placeholder
-        return (
-            <div className="text-center text-gray-400 flex flex-col justify-center items-center h-full min-h-[200px]">
-                <Icon path="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" className="w-16 h-16 text-gray-400 mb-4" />
-                <h3 className="mt-2 text-lg font-medium text-gray-900">استكشف عالم الأحلام</h3>
-                <p className="mt-1 text-md text-gray-500">ابحث عن رمز أو اختر فئة لعرض التفسيرات.</p>
-            </div>
-        );
-    };
+    const filteredSymbols = Object.keys(symbols).filter(key => key.includes(searchTerm));
 
     return (
-        <PageTemplate title="معجم تفسير الأحلام" setPage={setPage} showBackButton={true}>
-            <p className="text-lg text-center text-gray-600 -mt-4 mb-8">على ضوء تفسيرات ابن سيرين والنابلسي</p>
+        <PageTemplate title="معجم الأحلام" setPage={setPage}>
+            <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="ابحث عن رمز..." className="w-full p-3 bg-white border border-slate-300 rounded-lg mb-6 text-gray-800" />
 
-            {/* Search and Autocomplete Section */}
-            <div ref={searchWrapperRef} className="bg-white p-6 rounded-2xl shadow-lg mb-6 relative">
-                <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="relative flex-grow">
-                        <input
-                            type="text"
-                            id="searchInput"
-                            placeholder="ابحث عن رمز..."
-                            className="w-full px-4 py-3 bg-gray-100 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                            value={searchTerm}
-                            onChange={handleSearchChange}
-                            onKeyPress={(e) => e.key === 'Enter' && performSearch()}
-                        />
-                        {autocompleteSuggestions.length > 0 && (
-                            <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg mt-1 shadow-xl">
-                                {autocompleteSuggestions.map(s => (
-                                    <div
-                                        key={s.symbol}
-                                        className="p-3 hover:bg-indigo-100 cursor-pointer"
-                                        onClick={() => selectSuggestion(s.symbol)}
-                                    >
-                                        {s.symbol}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                    <button
-                        onClick={() => performSearch()}
-                        className="w-full sm:w-auto bg-indigo-600 text-white font-semibold px-8 py-3 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-transform transform hover:scale-105"
-                    >
-                        بحث
+            {selectedSymbol ? (
+                <div className="animate-fade-in">
+                    <button onClick={() => setSelectedSymbol(null)} className="flex items-center text-sky-600 mb-4">
+                        <Icon path="M15.75 19.5L8.25 12l7.5-7.5" className="w-4 h-4 ml-2"/>
+                        العودة للمعجم
                     </button>
+                    <h3 className="text-2xl font-bold mb-2 text-gray-800">{selectedSymbol}</h3>
+                    <p className="text-gray-600 leading-loose">{symbols[selectedSymbol]}</p>
                 </div>
-            </div>
-
-            {/* Categories Section */}
-            <div className="mb-8">
-                 <h2 className="text-xl font-bold mb-4 text-center text-gray-700">أو تصفح حسب الفئة</h2>
-                 <div className="flex flex-wrap justify-center gap-3">
-                    {categories.map(cat => (
-                        <button
-                            key={cat}
-                            onClick={() => showCategory(cat)}
-                            className={`px-4 py-2 border-2 rounded-full font-semibold transition ${
-                                activeCategory === cat
-                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                : 'border-gray-300 text-gray-600 hover:bg-indigo-100'
-                            }`}
-                        >
-                            {cat}
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredSymbols.map(key => (
+                        <button key={key} onClick={() => setSelectedSymbol(key)} className="p-4 bg-white rounded-lg text-right hover:bg-slate-50 transition-colors shadow-sm">
+                            <h3 className="text-lg font-semibold text-gray-700">{key}</h3>
                         </button>
                     ))}
-                 </div>
-            </div>
-
-            {/* Results Section */}
-            <main className="bg-white p-6 sm:p-8 rounded-2xl shadow-lg min-h-[300px]">
-                {renderResults()}
-            </main>
+                </div>
+            )}
         </PageTemplate>
     );
 };
