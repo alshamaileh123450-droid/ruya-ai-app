@@ -599,9 +599,9 @@ const DreamDictionary = ({ setPage }) => {
                         <h2 className="text-3xl font-bold text-indigo-700">{selectedInterpretation.symbol}</h2>
                         <button
                             onClick={() => handleSaveToJournal(selectedInterpretation.symbol)}
-                            className={`flex-shrink-0 text-white font-semibold px-4 py-2 rounded-lg focus:outline-none focus:ring-2 transition-all transform hover:scale-105 ${isSaved ? 'bg-blue-500' : 'bg-green-500 hover:bg-green-600 focus:ring-green-400'}`}
+                            className={`flex-shrink-0 text-white font-semibold px-4 py-2 rounded-lg focus:outline-none focus:ring-2 transition-all transform hover:scale-105 flex items-center justify-center ${isSaved ? 'bg-blue-500' : 'bg-green-500 hover:bg-green-600 focus:ring-green-400'}`}
                         >
-                            <i className={`fas ${isSaved ? 'fa-check' : 'fa-book-medical'} ml-2`}></i>
+                            <Icon path={isSaved ? "M4.5 12.75l6 6 9-13.5" : "M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.5 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"} className="w-5 h-5 ml-2" />
                             {isSaved ? 'تم الحفظ!' : 'حفظ في سجلي'}
                         </button>
                     </div>
@@ -640,7 +640,7 @@ const DreamDictionary = ({ setPage }) => {
         // Placeholder
         return (
             <div className="text-center text-gray-400 flex flex-col justify-center items-center h-full min-h-[200px]">
-                <i className="fas fa-moon text-5xl mb-4"></i>
+                <Icon path="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" className="w-16 h-16 text-gray-400 mb-4" />
                 <h3 className="mt-2 text-lg font-medium text-gray-900">استكشف عالم الأحلام</h3>
                 <p className="mt-1 text-md text-gray-500">ابحث عن رمز أو اختر فئة لعرض التفسيرات.</p>
             </div>
