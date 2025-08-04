@@ -1,0 +1,671 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+    getAuth, 
+    onAuthStateChanged, 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, 
+    signOut,
+    GoogleAuthProvider,
+    signInWithPopup,
+    getAdditionalUserInfo
+} from 'firebase/auth';
+import { 
+    getFirestore, 
+    doc, 
+    setDoc, 
+    getDoc,
+    addDoc,
+    collection,
+    query,
+    getDocs,
+    updateDoc
+} from 'firebase/firestore';
+
+
+// --- Firebase Configuration ---
+const firebaseConfig = {
+  apiKey: "AIzaSyCHF7BEhsX9Gt0teK4eQdkP0zaPyEikc10",
+  authDomain: "ruya-ai-f2392.firebaseapp.com",
+  projectId: "ruya-ai-f2392",
+  storageBucket: "ruya-ai-f2392.appspot.com",
+  messagingSenderId: "546319067200",
+  appId: "1:546319067200:web:47ff7d2f7dda72f1cd17a5",
+  measurementId: "G-287G1WF94N"
+};
+const appId = firebaseConfig.appId;
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+
+// --- Helper Components ---
+
+const Icon = ({ path, className = "w-6 h-6" }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d={path} />
+    </svg>
+);
+
+const Toast = ({ message, type }) => {
+    const bgColor = type === 'error' ? 'bg-red-600' : 'bg-green-600';
+    return (
+        <div className={`fixed bottom-5 right-5 ${bgColor} text-white py-3 px-6 rounded-lg shadow-2xl animate-fade-in z-50`}>
+            {message}
+        </div>
+    );
+};
+
+const PageTemplate = ({ title, children, setPage, showBackButton = true }) => (
+    <div className="animate-fade-in p-4 md:p-6">
+        {showBackButton && (
+            <button onClick={() => setPage('dashboard')} className="flex items-center text-gray-500 hover:text-sky-600 mb-6 transition-colors">
+                <Icon path="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" className="w-5 h-5 ml-2 transform scale-x-[-1]" />
+                العودة للرئيسية
+            </button>
+        )}
+        <div className="bg-white/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg">
+             <h1 className="text-3xl font-bold text-center mb-6 text-gray-800">{title}</h1>
+            {children}
+        </div>
+    </div>
+);
+
+// --- Authentication Views ---
+
+const AuthPage = ({ showToast }) => {
+    const [mode, setMode] = useState('login');
+
+    const handleGoogleSignIn = async () => {
+        const provider = new GoogleAuthProvider();
+        try {
+            const result = await signInWithPopup(auth, provider);
+            const user = result.user;
+            const additionalInfo = getAdditionalUserInfo(result);
+
+            if (additionalInfo.isNewUser) {
+                const userDocRef = doc(db, 'artifacts', appId, 'users', user.uid);
+                await setDoc(userDocRef, {
+                    name: user.displayName,
+                    email: user.email,
+                    photoURL: user.photoURL,
+                    createdAt: new Date()
+                });
+                showToast("تم إنشاء الحساب بنجاح عبر جوجل!");
+            } else {
+                 showToast("مرحباً بعودتك!");
+            }
+        } catch (error) {
+            console.error("Google Sign-In Error:", error);
+            showToast("فشل تسجيل الدخول عبر جوجل.", "error");
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-slate-100 flex flex-col justify-center items-center p-4" dir="rtl">
+            <div className="w-full max-w-sm">
+                <div className="text-center mb-8">
+                     <div className="inline-block p-4 bg-white rounded-full shadow-md">
+                        <Icon path="M2.036 12.322a1.012 1.012 0 010-.639l4.25-6.5a1.012 1.012 0 011.628.012l.509.816a1.012 1.012 0 001.274.588l5.692-2.016a1.012 1.012 0 011.106 1.106l-2.016 5.692a1.012 1.012 0 00.588 1.274l.816.509a1.012 1.012 0 01.012 1.628l-6.5 4.25a1.012 1.012 0 01-.639 0l-6.5-4.25a1.012 1.012 0 01-.012-1.628l.816-.509a1.012 1.012 0 00.588-1.274l-2.016-5.692a1.012 1.012 0 01-1.106-1.106l5.692-2.016a1.012 1.012 0 001.274-.588l.509-.816a1.012 1.012 0 011.628-.012l4.25 6.5a1.012 1.012 0 010 .639l-4.25 6.5a1.012 1.012 0 01-1.628.012l-.509-.816a1.012 1.012 0 00-1.274-.588l-5.692 2.016a1.012 1.012 0 01-1.106-1.106l2.016-5.692a1.012 1.012 0 00-.588-1.274l-.816-.509z" className="w-12 h-12 text-sky-500" />
+                    </div>
+                    <h1 className="text-3xl font-bold text-gray-800 mt-4">RuyaAI</h1>
+                    <p className="text-gray-500">رفيقك لتفسير الأحلام</p>
+                </div>
+                <div className="bg-white p-2 rounded-2xl shadow-xl">
+                    <div className="flex justify-center bg-slate-100 rounded-xl p-1 mb-4">
+                        <button onClick={() => setMode('signup')} className={`w-1/2 py-2 text-center font-semibold transition-all duration-300 rounded-lg ${mode === 'signup' ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-500'}`}>إنشاء حساب</button>
+                        <button onClick={() => setMode('login')} className={`w-1/2 py-2 text-center font-semibold transition-all duration-300 rounded-lg ${mode === 'login' ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-500'}`}>تسجيل الدخول</button>
+                    </div>
+                    <div className="p-6">
+                        {mode === 'login' ? <LoginForm showToast={showToast} handleGoogleSignIn={handleGoogleSignIn} /> : <SignupForm showToast={showToast} />}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const LoginForm = ({ showToast, handleGoogleSignIn }) => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        setIsLoading(true);
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch (error) {
+            showToast("فشل تسجيل الدخول. تأكد من البريد الإلكتروني وكلمة المرور.", 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <div className="animate-fade-in-fast">
+            <h2 className="text-2xl font-bold text-center text-gray-800">مرحباً بعودتك!</h2>
+            <p className="text-center text-gray-500 mb-6">سجل الدخول للمتابعة</p>
+            <form onSubmit={handleLogin}>
+                <div className="space-y-4">
+                    <input type="email" placeholder="البريد الإلكتروني" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3 bg-slate-100 border-slate-200 rounded-lg text-gray-800" required />
+                    <input type="password" placeholder="كلمة المرور" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 bg-slate-100 border-slate-200 rounded-lg text-gray-800" required />
+                </div>
+                <button type="submit" disabled={isLoading} className="w-full mt-6 py-3 px-6 bg-gradient-to-r from-sky-500 to-cyan-500 text-white rounded-lg font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all disabled:opacity-50">{isLoading ? '...' : 'تسجيل الدخول'}</button>
+            </form>
+            <div className="flex items-center my-6"><div className="flex-grow border-t border-slate-200"></div><span className="mx-4 text-gray-400 text-sm">أو</span><div className="flex-grow border-t border-slate-200"></div></div>
+            <button onClick={handleGoogleSignIn} className="w-full py-3 px-6 border border-slate-300 rounded-lg flex items-center justify-center text-gray-700 hover:bg-slate-50 transition-colors">
+                <img src="https://www.google.com/favicon.ico" alt="Google icon" className="w-5 h-5 ml-3" />
+                المتابعة باستخدام Google
+            </button>
+        </div>
+    );
+};
+
+const SignupForm = ({ showToast }) => {
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleSignup = async (e) => {
+        e.preventDefault();
+        setIsLoading(true);
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+            const userDocRef = doc(db, 'artifacts', appId, 'users', user.uid);
+            await setDoc(userDocRef, { name: name, email: user.email, createdAt: new Date() });
+        } catch (error) {
+            showToast("فشل إنشاء الحساب. قد يكون البريد الإلكتروني مستخدماً.", 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <div className="animate-fade-in-fast">
+            <h2 className="text-2xl font-bold text-center text-gray-800">إنشاء حساب جديد</h2>
+            <form onSubmit={handleSignup} className="mt-6">
+                <div className="space-y-4">
+                    <input type="text" placeholder="الاسم الكامل" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-3 bg-slate-100 border-slate-200 rounded-lg text-gray-800" required />
+                    <input type="email" placeholder="البريد الإلكتروني" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3 bg-slate-100 border-slate-200 rounded-lg text-gray-800" required />
+                    <input type="password" placeholder="كلمة المرور" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 bg-slate-100 border-slate-200 rounded-lg text-gray-800" required />
+                </div>
+                <button type="submit" disabled={isLoading} className="w-full mt-6 py-3 px-6 bg-gradient-to-r from-sky-500 to-cyan-500 text-white rounded-lg font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all disabled:opacity-50">{isLoading ? '...' : 'إنشاء حساب'}</button>
+            </form>
+        </div>
+    );
+};
+
+
+// --- Main App Pages ---
+
+const FeatureButton = ({ icon, title, description, onClick }) => (
+    <button onClick={onClick} className="text-right p-4 bg-white hover:bg-slate-50 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 flex items-center">
+        <div className="p-3 bg-sky-100 rounded-lg ml-4">
+            <Icon path={icon} className="w-8 h-8 text-sky-600" />
+        </div>
+        <div>
+            <h3 className="text-lg font-bold text-gray-800">{title}</h3>
+            {description && <p className="text-sm text-gray-500">{description}</p>}
+        </div>
+    </button>
+);
+
+
+const Dashboard = ({ setPage, userName }) => (
+    <div className="animate-fade-in p-4 md:p-6">
+        <h1 className="text-3xl md:text-4xl font-bold text-center mb-4 text-gray-800">أهلاً بك، {userName}!</h1>
+        <p className="text-center text-gray-500 mb-8">ما الذي تود أن تفعله اليوم؟</p>
+        <div className="space-y-4">
+            <button onClick={() => setPage('interpret')} className="w-full flex items-center justify-start text-right p-6 bg-gradient-to-r from-sky-500 to-cyan-400 text-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                <Icon path="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.006 3 11.5c0 2.39.998 4.563 2.634 6.115l-1.13 3.39a.75.75 0 00.93.93l3.39-1.13A8.96 8.96 0 0012 20.25z" className="w-12 h-12 ml-5" />
+                <div>
+                    <h2 className="text-2xl font-bold">تفسير حلم جديد</h2>
+                    <p className="text-sky-100">ابدأ حواراً تفاعلياً مع المفسر الذكي</p>
+                </div>
+            </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FeatureButton onClick={() => setPage('profile')} icon="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" title="الملف الشخصي" description="عرض سجل أحلامك" />
+                <FeatureButton onClick={() => setPage('dictionary')} icon="M12 6.042A8.955 8.955 0 003 15c0 5.026 4.03 9.098 9.098 9.098 5.068 0 9.098-4.072 9.098-9.098A8.955 8.955 0 0012 6.042zm0 15.316A6.223 6.223 0 015.777 15c0-3.44 2.786-6.226 6.223-6.226s6.223 2.786 6.223 6.226A6.223 6.223 0 0112 21.358z" title="معجم الأحلام" description="ابحث عن رموز ودلالات" />
+                <FeatureButton onClick={() => setPage('articles')} icon="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" title="قسم المقالات" description="اقرأ عن عالم الأحلام" />
+                <FeatureButton onClick={() => {}} icon="M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9 9.75a.75.75 0 01.75-.75h.008a.75.75 0 010 1.5H9.75A.75.75 0 019 9.75zm6 0a.75.75 0 01.75-.75h.008a.75.75 0 010 1.5H15.75a.75.75 0 01-.75-.75z" title="تحليل المشاعر" description="اكتشف مشاعرك في الحلم" />
+                <FeatureButton onClick={() => {}} icon="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m-7.5-2.962a3.752 3.752 0 01-4.136-3.752A3.752 3.752 0 019.25 6.5a3.752 3.752 0 013.75 3.752c0 1.223-.624 2.31-1.568 2.962M21 12a9 9 0 11-18 0 9 9 0 0118 0z" title="مجتمع المستخدمين" description="شارك أحلامك وتجاربك" />
+                <FeatureButton onClick={() => setPage('manageSubscription')} icon="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h6m3-3.75l3 3m0 0l3-3m-3 3V1.5m9 5.25h-6M2.25 21h19.5" title="إدارة الاشتراك" description="عرض أو تغيير خطتك" />
+            </div>
+        </div>
+    </div>
+);
+
+const TypingMessage = ({ text }) => {
+    const [displayedText, setDisplayedText] = useState('');
+
+    useEffect(() => {
+        setDisplayedText(''); // Reset on new text
+        let i = 0;
+        const intervalId = setInterval(() => {
+            setDisplayedText(text.substring(0, i + 1));
+            i++;
+            if (i > text.length) {
+                clearInterval(intervalId);
+            }
+        }, 20); // Adjust speed of typing here
+        return () => clearInterval(intervalId);
+    }, [text]);
+
+    return <p className="whitespace-pre-wrap">{displayedText}</p>;
+};
+
+
+const Interpretation = ({ setPage, showToast, userId }) => {
+    const [messages, setMessages] = useState([]);
+    const [input, setInput] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [conversationState, setConversationState] = useState({
+        mode: null,
+        step: 'start',
+        data: {}
+    });
+    const chatEndRef = useRef(null);
+
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages, isLoading]);
+
+    const addMessage = (sender, text, options = null, isTyping = false) => {
+        setMessages(prev => [...prev, { sender, text, options, isTyping }]);
+    };
+
+    const handleModeSelect = (mode) => {
+        setConversationState({ mode, step: 'asking_name', data: {} });
+        addMessage('ai', "مرحبًا بك في RuyaAI لتفسير الأحلام. قبل أن نبدأ، ما هو اسمك الكريم؟");
+    };
+
+    const processUserInput = async () => {
+        const userInput = input.trim();
+        if (!userInput) return;
+
+        addMessage('user', userInput);
+        setInput('');
+        let nextStep = conversationState.step;
+        let newData = { ...conversationState.data, [conversationState.step]: userInput };
+
+        switch (conversationState.step) {
+            case 'asking_name':
+                newData.name = userInput;
+                addMessage('ai', `شكرًا لك يا ${userInput}. الآن أخبرني عن رؤياك بالتفصيل.`);
+                nextStep = 'asking_dream';
+                break;
+            
+            case 'asking_dream':
+                newData.dream = userInput;
+                if (conversationState.mode === 'deep') {
+                    addMessage('ai', `شكرًا لك يا ${newData.name}. هل ظهر أشخاص في رؤياك؟ إذا كان الأمر كذلك، هل تعرفهم وما أسماؤهم وصلتك بهم؟ (يمكنك كتابة "لا يوجد" إن لم يظهر أحد)`);
+                    nextStep = 'asking_characters';
+                } else { // basic mode
+                    addMessage('ai', `حسنًا يا ${newData.name}. هل يمكنك تحديد جنسك؟`, ['ذكر', 'أنثى']);
+                    nextStep = 'asking_gender';
+                }
+                break;
+            
+            case 'asking_social_status':
+                newData.social_status = userInput;
+                addMessage('ai', 'شكرًا لك. هل تود مشاركة أي تفاصيل عن حالتك النفسية، الصحية، أو العاطفية؟ (هذا اختياري، يمكنك كتابة "لا أرغب")');
+                nextStep = 'asking_mood';
+                break;
+
+            case 'asking_mood':
+                newData.mood = userInput;
+                await getInterpretation(newData);
+                nextStep = 'follow_up';
+                break;
+            
+            case 'asking_characters':
+                 newData.characters = userInput;
+                 addMessage('ai', `فهمت. الآن، هل يمكنك تحديد جنسك؟`, ['ذكر', 'أنثى']);
+                 nextStep = 'asking_gender';
+                 break;
+            
+            case 'follow_up':
+                newData.follow_up_question = userInput;
+                await getFollowUp(newData);
+                nextStep = 'follow_up'; 
+                break;
+        }
+        setConversationState({ ...conversationState, step: nextStep, data: newData });
+    };
+    
+    const handleOptionClick = (option) => {
+        addMessage('user', option);
+        let nextStep = conversationState.step;
+        let newData = { ...conversationState.data };
+
+        if (conversationState.step === 'asking_gender') {
+             newData.gender = option;
+             addMessage('ai', 'شكرًا لك. وما هي حالتك الاجتماعية؟', ['أعزب/عزباء', 'متزوج/ة', 'مطلق/ة', 'أرمل/ة']);
+             nextStep = 'asking_social_status';
+        } else if (conversationState.step === 'asking_social_status') {
+            newData.social_status = option;
+            addMessage('ai', 'شكرًا لك. هل تود مشاركة أي تفاصيل عن حالتك النفسية، الصحية، أو العاطفية؟ (هذا اختياري، يمكنك كتابة "لا أرغب")');
+            nextStep = 'asking_mood';
+        }
+        setConversationState({ ...conversationState, step: nextStep, data: newData });
+    };
+
+    const getInterpretation = async (collectedData) => {
+        setIsLoading(true);
+        let prompt = '';
+        if (conversationState.mode === 'basic') {
+            prompt = `أنت معبر أحلام خبير على منهج أهل السنة والجماعة، وتعتمد في تفسيراتك على كتب ابن سيرين والنابلسي. قم بتحليل الرؤيا التالية للمستخدم وقدم تفسيراً واقعياً ومخصصاً.
+            - اسم الرائي: ${collectedData.name}
+            - الجنس: ${collectedData.gender}
+            - الحالة الاجتماعية: ${collectedData.social_status}
+            - الحالة النفسية/الصحية: ${collectedData.mood}
+            - نص الرؤيا: "${collectedData.dream}"
+            خاطب المستخدم باسمه. اذكر معاني الرموز بشكل موجز وواضح داخل التفسير. اجعل التفسير يبدو كأنه نص يُكتب مباشرة للمستخدم. بعد الانتهاء، اسأل المستخدم إذا كان لديه أي استفسار آخر.`;
+        } else { // deep
+             prompt = `أنت محلل نفسي وخبير في علم الرموز. قم بتحليل الحلم التالي بعمق.
+            - اسم الرائي: ${collectedData.name}
+            - الجنس: ${collectedData.gender}
+            - الحالة الاجتماعية: ${collectedData.social_status}
+            - الحالة النفسية/الصحية: ${collectedData.mood}
+            - نص الحلم: "${collectedData.dream}"
+            - شخصيات في الحلم وعلاقتهم بالرائي: ${collectedData.characters || 'لم يحدد'}
+            التحليل يجب أن يربط دلالات الأسماء (إن وجدت) بسياق الرؤيا، ويقدم رسالة منطقية وهادفة بناءً على كل البيانات المتاحة.`;
+        }
+
+        try {
+            const apiKey = "AIzaSyCMtcUn0JC3WXRq-ycJKk9h_8irgxmoszg";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const payload = { contents: [{ parts: [{ text: prompt }] }] };
+            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!response.ok) throw new Error(`API request failed`);
+            const result = await response.json();
+            const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "لم أتمكن من الحصول على تفسير.";
+            setIsLoading(false);
+            addMessage('ai', text, null, true); 
+            await saveDream(collectedData.dream, text);
+            setTimeout(() => {
+                 addMessage('ai', `هل هناك أي جزء من التفسير تحب أن أوضحه لك يا ${collectedData.name}؟`);
+            }, 50 * text.length); 
+        } catch (err) {
+            setIsLoading(false);
+            addMessage('ai', "عذراً، حدث خطأ أثناء محاولة تفسير الحلم.");
+        }
+    };
+    
+    const getFollowUp = async (collectedData) => {
+         setIsLoading(true);
+         const prompt = `المستخدم لديه سؤال متابعة حول تفسير الحلم.
+         - بيانات المستخدم: ${JSON.stringify(collectedData)}
+         - سؤال المتابعة: "${collectedData.follow_up_question}"
+         قدم إجابة توضيحية ومختصرة.`;
+          try {
+            const apiKey = "AIzaSyCMtcUn0JC3WXRq-ycJKk9h_8irgxmoszg";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const payload = { contents: [{ parts: [{ text: prompt }] }] };
+            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const result = await response.json();
+            const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "لا أستطيع الإجابة على هذا السؤال حالياً.";
+            setIsLoading(false);
+            addMessage('ai', text, null, true);
+        } catch (err) {
+            setIsLoading(false);
+            addMessage('ai', "عذراً، حدث خطأ.");
+        }
+    };
+    
+    const showInput = ['asking_name', 'asking_mood', 'asking_dream', 'asking_characters', 'follow_up'].includes(conversationState.step);
+
+    return (
+        <PageTemplate title="تفسير الأحلام" setPage={setPage}>
+            {conversationState.step === 'start' ? (
+                <div className="animate-fade-in text-center">
+                    <p className="text-gray-600 mb-6">أهلاً بك. كيف يمكنني مساعدتك اليوم؟ الرجاء اختيار نوع التفسير الذي تفضله.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button id="basic-interpret-button" onClick={() => handleModeSelect('basic')} className="p-6 bg-gradient-to-br from-sky-500 to-cyan-400 text-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center justify-center h-40">
+                            <Icon path="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" className="w-10 h-10 mb-2"/>
+                            <h3 className="text-xl font-bold">التفسير العادي</h3>
+                        </button>
+                        <button id="deep-interpret-button" onClick={() => handleModeSelect('deep')} className="p-6 bg-gradient-to-br from-indigo-500 to-purple-500 text-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center justify-center h-40">
+                            <Icon path="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" className="w-10 h-10 mb-2"/>
+                            <h3 className="text-xl font-bold">التفسير العميق</h3>
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <div className="flex flex-col h-[60vh]">
+                    <div className="flex-grow overflow-y-auto p-4 space-y-4">
+                        {messages.map((msg, index) => (
+                            <div key={index} className={`flex items-end gap-2 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                {msg.sender === 'ai' && <div className="w-8 h-8 rounded-full bg-sky-500 flex-shrink-0"></div>}
+                                <div className={`max-w-xs md:max-w-md p-3 rounded-2xl ${msg.sender === 'user' ? 'bg-sky-600 text-white rounded-br-none' : 'bg-slate-200 text-gray-700 rounded-bl-none'}`}>
+                                    {msg.isTyping ? <TypingMessage text={msg.text} /> : <p className="whitespace-pre-wrap">{msg.text}</p>}
+                                    {msg.options && (
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            {msg.options.map(opt => <button key={opt} onClick={() => handleOptionClick(opt)} className="px-3 py-1 bg-sky-500 text-white text-sm rounded-full hover:bg-sky-600">{opt}</button>)}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                        {isLoading && <div className="flex items-end gap-2 justify-start"><div className="w-8 h-8 rounded-full bg-sky-500 flex-shrink-0"></div><div className="p-3 rounded-2xl bg-slate-200"><div className="flex items-center gap-2"><span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></span><span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-150"></span><span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse delay-300"></span></div></div></div>}
+                        <div ref={chatEndRef} />
+                    </div>
+                    {showInput && (
+                    <form onSubmit={(e) => { e.preventDefault(); processUserInput(); }} className="p-4 border-t border-slate-200 flex items-center gap-2">
+                        <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="اكتب ردك هنا..." className="flex-grow p-3 bg-slate-100 border border-slate-300 rounded-lg text-gray-800" />
+                        <button type="submit" disabled={isLoading || !input.trim()} className="p-3 bg-sky-600 hover:bg-sky-700 rounded-lg disabled:opacity-50 transition-colors">
+                            <Icon path="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" className="w-6 h-6 text-white"/>
+                        </button>
+                    </form>
+                    )}
+                </div>
+            )}
+        </PageTemplate>
+    );
+};
+
+const Profile = ({ setPage, userName, userId, photoURL }) => {
+    const [dreamLog, setDreamLog] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchDreams = async () => {
+            if (!userId) return;
+            setIsLoading(true);
+            const dreamsCollectionRef = collection(db, 'artifacts', appId, 'users', userId, 'dreams');
+            const q = query(dreamsCollectionRef);
+            const querySnapshot = await getDocs(q);
+            const dreams = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), date: doc.data().date.toDate().toLocaleDateString('ar-EG')}));
+            setDreamLog(dreams);
+            setIsLoading(false);
+        };
+        fetchDreams();
+    }, [userId]);
+
+    return (
+        <PageTemplate title="ملفي الشخصي" setPage={setPage}>
+            <div className="text-center mb-8"><div className="relative inline-block"><div className="w-24 h-24 rounded-full bg-sky-200 flex items-center justify-center text-4xl font-bold text-sky-700 shadow-lg overflow-hidden">
+                {photoURL ? <img src={photoURL} alt={userName} className="w-full h-full object-cover" /> : userName.charAt(0).toUpperCase()}
+            </div></div><h2 className="text-2xl font-bold mt-4 text-gray-800">{userName}</h2><p className="text-gray-500">عضو مميز</p></div>
+            <h3 className="text-xl font-bold mb-4 text-gray-700">سجل أحلامك السابقة</h3>
+            {isLoading ? <div className="text-center py-4 text-gray-500">جاري تحميل الأحلام...</div> : dreamLog.length > 0 ? <div className="space-y-3">{dreamLog.map(dream => (<div key={dream.id} className="bg-white p-4 rounded-lg flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"><p className="font-semibold text-gray-700">{dream.title}</p><p className="text-sm text-gray-500">{dream.date}</p></div>))}</div> : <div className="text-center py-4 text-gray-400">لم تقم بتفسير أي أحلام بعد.</div>}
+        </PageTemplate>
+    );
+};
+
+const DreamDictionary = ({ setPage }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedSymbol, setSelectedSymbol] = useState(null);
+    const symbols = {
+        'القطة': 'القطة في الحلم قد ترمز إلى الأنثى الماكرة أو الغادرة، وقد تدل على الخداع أو السرقة. رؤية قطة أليفة قد تكون علامة على الراحة والهدوء.',
+        'الطيران': 'الطيران في الحلم يرمز غالبًا إلى الحرية والطموح والارتقاء. إذا كان الطيران سهلاً وممتعاً، فهو يدل على تحقيق الأهداف والنجاح.',
+        'البحر': 'البحر يمثل الدنيا وأهوالها. البحر الهادئ يدل على الاستقرار والرزق، بينما البحر الهائج يرمز إلى الفتن والمشاكل والصعوبات.',
+        'الأسد': 'الأسد يرمز إلى السلطان أو الحاكم القوي، وقد يدل على العدو الشديد. النصر على الأسد يعني النصر على الأعداء.',
+        'الثعبان': 'الثعبان في الحلم عدو. حجمه وقوته يمثلان قوة العدو. لدغة الثعبان قد تدل على ضرر يصيب الرائي من عدوه.'
+    };
+
+    const filteredSymbols = Object.keys(symbols).filter(key => key.includes(searchTerm));
+
+    return (
+        <PageTemplate title="معجم الأحلام" setPage={setPage}>
+            <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="ابحث عن رمز..." className="w-full p-3 bg-white border border-slate-300 rounded-lg mb-6 text-gray-800" />
+            
+            {selectedSymbol ? (
+                <div className="animate-fade-in">
+                    <button onClick={() => setSelectedSymbol(null)} className="flex items-center text-sky-600 mb-4">
+                        <Icon path="M15.75 19.5L8.25 12l7.5-7.5" className="w-4 h-4 ml-2"/>
+                        العودة للمعجم
+                    </button>
+                    <h3 className="text-2xl font-bold mb-2 text-gray-800">{selectedSymbol}</h3>
+                    <p className="text-gray-600 leading-loose">{symbols[selectedSymbol]}</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredSymbols.map(key => (
+                        <button key={key} onClick={() => setSelectedSymbol(key)} className="p-4 bg-white rounded-lg text-right hover:bg-slate-50 transition-colors shadow-sm">
+                            <h3 className="text-lg font-semibold text-gray-700">{key}</h3>
+                        </button>
+                    ))}
+                </div>
+            )}
+        </PageTemplate>
+    );
+};
+
+const Articles = ({ setPage }) => {
+    const articles = [
+        { title: '10 رموز شائعة في الأحلام وماذا تعني؟', author: 'فريق RuyaAI', date: '1 أغسطس 2025' },
+        { title: 'كيف تفرق بين الحلم والرؤيا؟', author: 'فريق RuyaAI', date: '28 يوليو 2025' },
+        { title: 'الأحلام والكوابيس: فهم عقلك الباطن', author: 'فريق RuyaAI', date: '25 يوليو 2025' },
+        { title: 'تأثير حالتك النفسية على أحلامك', author: 'فريق RuyaAI', date: '22 يوليو 2025' },
+    ];
+    return (
+        <PageTemplate title="قسم المقالات" setPage={setPage}>
+            <div className="space-y-4">
+                {articles.map((article, index) => (
+                    <div key={index} className="p-4 bg-white rounded-lg cursor-pointer hover:bg-slate-50 transition-colors shadow-sm">
+                        <h3 className="text-xl font-bold mb-1 text-gray-800">{article.title}</h3>
+                        <p className="text-sm text-gray-500">{article.author} - {article.date}</p>
+                    </div>
+                ))}
+            </div>
+        </PageTemplate>
+    );
+};
+
+
+// --- Other pages remain the same ---
+const SubscriptionPlans = ({ setPage }) => ( <PageTemplate title="خطط الاشتراك" setPage={setPage}> ... </PageTemplate> );
+const ManageSubscription = ({ setPage }) => { const [s, setS] = useState(false); return (<PageTemplate title="إدارة اشتراكك" setPage={setPage}>{s && <div className="fixed inset-0">...</div>}<p>...</p><div>...</div></PageTemplate>);};
+const Settings = ({ setPage, userName, showToast }) => { return (<PageTemplate title="الإعدادات" setPage={setPage}>...</PageTemplate>); };
+const AboutUs = ({ setPage }) => ( <PageTemplate title="من نحن" setPage={setPage}>...</PageTemplate> );
+const PrivacyPolicy = ({ setPage }) => ( <PageTemplate title="سياسة الخصوصية" setPage={setPage}>...</PageTemplate> );
+
+
+// --- Main App Component ---
+export default function App() {
+    const [user, setUser] = useState(null);
+    const [userData, setUserData] = useState({ name: 'زائر', email: '', photoURL: null });
+    const [isLoading, setIsLoading] = useState(true);
+    const [page, setPage] = useState('dashboard');
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+    const menuRef = useRef(null);
+
+    const showToast = (message, type = 'success') => {
+        setToast({ show: true, message, type });
+        setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+    };
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                const userDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid);
+                const userDoc = await getDoc(userDocRef);
+                if (userDoc.exists()) {
+                    setUserData(userDoc.data());
+                }
+                setUser(currentUser);
+            } else {
+                setUser(null);
+                setUserData({ name: 'زائر', email: '', photoURL: null });
+            }
+            setIsLoading(false);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => { if (menuRef.current && !menuRef.current.contains(event.target)) setIsMenuOpen(false); };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [menuRef]);
+
+    const handleSetPage = (newPage) => { setPage(newPage); setIsMenuOpen(false); };
+    const handleLogout = async () => { await signOut(auth); handleSetPage('dashboard'); };
+
+    const renderPage = () => {
+        switch (page) {
+            case 'interpret': return <Interpretation setPage={handleSetPage} showToast={showToast} userId={user?.uid} />;
+            case 'profile': return <Profile setPage={handleSetPage} userName={userData.name} userId={user?.uid} photoURL={userData.photoURL} />;
+            case 'dictionary': return <DreamDictionary setPage={handleSetPage} />;
+            case 'articles': return <Articles setPage={handleSetPage} />;
+            case 'subscriptionPlans': return <SubscriptionPlans setPage={handleSetPage} />;
+            case 'manageSubscription': return <ManageSubscription setPage={handleSetPage} />;
+            case 'settings': return <Settings setPage={handleSetPage} userName={userData.name} showToast={showToast} />;
+            case 'about': return <AboutUs setPage={handleSetPage} />;
+            case 'privacy': return <PrivacyPolicy setPage={handleSetPage} />;
+            case 'dashboard':
+            default: return <Dashboard setPage={handleSetPage} userName={userData.name} />;
+        }
+    };
+    
+    if (isLoading) {
+        return <div className="min-h-screen bg-slate-100 flex items-center justify-center text-gray-800">جاري التحميل...</div>;
+    }
+
+    if (!user) {
+        return <AuthPage showToast={showToast} />;
+    }
+
+    return (
+        <div dir="rtl" style={{ fontFamily: "'Cairo', sans-serif" }}>
+            {toast.show && <Toast message={toast.message} type={toast.type} />}
+            <div className="bg-slate-100 text-gray-800 min-h-screen">
+                <header className="p-4 flex justify-between items-center border-b border-slate-200 sticky top-0 bg-white/80 backdrop-blur-sm z-10">
+                    <div className="flex items-center cursor-pointer" onClick={() => handleSetPage('dashboard')}>
+                         <Icon path="M2.036 12.322a1.012 1.012 0 010-.639l4.25-6.5a1.012 1.012 0 011.628.012l.509.816a1.012 1.012 0 001.274.588l5.692-2.016a1.012 1.012 0 011.106 1.106l-2.016 5.692a1.012 1.012 0 00.588 1.274l.816.509a1.012 1.012 0 01.012 1.628l-6.5 4.25a1.012 1.012 0 01-.639 0l-6.5-4.25a1.012 1.012 0 01-.012-1.628l.816-.509a1.012 1.012 0 00.588-1.274l-2.016-5.692a1.012 1.012 0 01-1.106-1.106l5.692-2.016a1.012 1.012 0 001.274-.588l.509-.816a1.012 1.012 0 011.628-.012l4.25 6.5a1.012 1.012 0 010 .639l-4.25 6.5a1.012 1.012 0 01-1.628.012l-.509-.816a1.012 1.012 0 00-1.274-.588l-5.692 2.016a1.012 1.012 0 01-1.106-1.106l2.016-5.692a1.012 1.012 0 00-.588-1.274l-.816-.509z" className="w-7 h-7 text-sky-600"/>
+                        <h1 className="text-xl font-bold mr-2 text-gray-800">RuyaAI</h1>
+                    </div>
+                     <div className="relative" ref={menuRef}>
+                        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center overflow-hidden">
+                           {userData.photoURL ? <img src={userData.photoURL} alt={userData.name} className="w-full h-full object-cover" /> : <Icon path="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" className="w-7 h-7 text-gray-500" />}
+                        </button>
+                        {isMenuOpen && (
+                            <div className="absolute left-0 mt-2 w-60 bg-white/80 backdrop-blur-sm rounded-lg shadow-2xl border border-slate-200 py-2 z-50 animate-fade-in-fast">
+                                <div className="px-4 py-2 border-b border-slate-200"><p className="font-bold text-gray-800">{userData.name}</p><p className="text-sm text-gray-500">{userData.email}</p></div>
+                                <a onClick={() => handleSetPage('manageSubscription')} className="block px-4 py-2 text-gray-600 hover:bg-slate-100 cursor-pointer">إدارة الاشتراك</a>
+                                <a onClick={() => handleSetPage('settings')} className="block px-4 py-2 text-gray-600 hover:bg-slate-100 cursor-pointer">الإعدادات</a>
+                                <a onClick={() => handleSetPage('about')} className="block px-4 py-2 text-gray-600 hover:bg-slate-100 cursor-pointer">من نحن</a>
+                                <a onClick={() => handleSetPage('privacy')} className="block px-4 py-2 text-gray-600 hover:bg-slate-100 cursor-pointer">سياسة الخصوصية</a>
+                                <div className="border-t border-slate-200 mt-2 pt-2"><a onClick={handleLogout} className="block px-4 py-2 text-red-500 hover:bg-slate-100 cursor-pointer">تسجيل الخروج</a></div>
+                            </div>
+                        )}
+                     </div>
+                </header>
+                <main className="w-full max-w-3xl mx-auto pb-10">{renderPage()}</main>
+            </div>
+             <style>{`
+                .animate-fade-in { animation: fadeIn 0.5s ease-in-out; }
+                @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+                .animate-fade-in-fast { animation: fadeInFast 0.2s ease-in-out; }
+                @keyframes fadeInFast { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+             `}</style>
+        </div>
+    );
+}
